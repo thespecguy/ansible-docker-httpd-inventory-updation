@@ -1,0 +1,7 @@
+- hosts: localhost
+  roles:
+  - role: container_creation
+
+- hosts: container
+  roles:
+  - role: container_webserver_setup 
