@@ -1,0 +1,7 @@
+---
+# vars file for container_creation
+
+mount_directory: "/dvd1"
+dockerhub_username: XXXX
+dockerhub_password: XXXX
+port_number: "80"

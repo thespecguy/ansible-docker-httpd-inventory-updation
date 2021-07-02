@@ -1,0 +1,122 @@
+---
+# tasks file for container_creation
+
+- name: Mount Directory Creation
+  file:
+    state: directory
+    path: "{{ mount_directory }}"
+
+- name: Mount Directory to CDROM
+  mount:
+    src: "/dev/cdrom"
+    path: "{{ mount_directory }}"
+    state: mounted
+    fstype: "iso9660"
+
+- name: Yum Repository - AppStream
+  yum_repository:
+    baseurl: "{{ mount_directory }}/AppStream"
+    name: "dvd1"
+    description: "Yum Repository - AppStream"
+    enabled: true
+    gpgcheck: no
+
+- name: Yum Repository - BaseOS
+  yum_repository:
+    baseurl: "{{ mount_directory }}/BaseOS"
+    name: "dvd2"
+    description: "Yum Repository - BaseOS"
+    enabled: true
+    gpgcheck: no
+
+- name: Docker Repository Setup
+  yum_repository:
+    baseurl: https://download.docker.com/linux/centos/7/x86_64/stable/
+    name: "docker"
+    description: "Docker Repository"
+    enabled: true
+    gpgcheck: no
+
+- name: Check whether Docker is installed or not
+  command: "rpm -q docker-ce"
+  register: docker_check
+
+- name: Docker Installation
+  command: "yum install docker-ce --nobest -y"
+  when: '"is not installed" in docker_check.stdout'
+
+- name: Starting Docker Service
+  service:
+    name: "docker"
+    state: started
+    enabled: yes
+
+- name: Python3 Installation
+  package:
+    name: "python36"
+    state: present
+
+- name: Installation of Docker SDK for Python
+  pip:
+    name: "docker-py"
+
+- name: Changing SELinux state to permissive
+  selinux:
+    policy: targeted
+    state: permissive
+
+- name: Stopping Firewall
+  service:
+    name: "firewalld"
+    state: stopped
+
+- name: DockerHub Login
+  docker_login:
+    username: "{{ dockerhub_username }}"
+    password: "{{ dockerhub_password }}"
+
+- name: Build Directory Creation
+  file:
+    path: /root/dockerfile
+    state: directory
+
+- name: Copying Dockerfile to the Build Directory
+  copy:
+    src: files/Dockerfile
+    dest: /root/dockerfile/Dockerfile
+
+- name: Building Image from Dockerfile and pushing it to DockerHub
+  community.docker.docker_image:
+    build:
+      path: /root/dockerfile
+    name: "{{ dockerhub_username }}/centos_ssh"
+    tag: v1
+    push: yes
+    source: build
+
+- name: Creation of container from the image created
+  docker_container:
+    name: centos_ssh_container
+    image: "{{ dockerhub_username }}/centos_ssh:v1"
+    pull: yes
+    detach: yes
+    state: started
+    ports:
+    - "{{ port_number }}:80"
+  register: container_info
+
+- name: Retrieving Container IP
+  shell: echo '{{container_info["ansible_facts"]["docker_container"]["NetworkSettings"]["IPAddress"] }}'
+  register: container_ip
+
+- name: Adding Container IP to the inventory file
+  template:
+    src: templates/inventory.yml
+    dest: /etc/inventory.yml
+
+- name: Removing EDCSA key from known_hosts file
+  lineinfile:
+    path: /root/.ssh/known_hosts
+    state: absent
+    regexp: "ecdsa-sha2-nistp256"
+

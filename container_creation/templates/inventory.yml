@@ -1,0 +1,3 @@
+[container]
+{{ container_ip.stdout }}  ansible_ssh_user=root  ansible_ssh_pass=centos
+
