@@ -1,0 +1,18 @@
+---
+# tasks file for container_webserver_setup
+
+- name: Httpd Installation
+  package:
+    name: "httpd"
+    state: present
+  register: httpd_install_status
+
+- name: Web Page Setup
+  copy:
+    dest: "/var/www/html/index.html"
+    src: "files/index.html"
+
+- name: Starting Httpd Service
+  command: "/usr/sbin/httpd"
+  changed_when: httpd_install_status.changed == true
+  
